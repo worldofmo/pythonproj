@@ -1,0 +1,290 @@
+# FINAL PROJECT
+def final_project_myl42():
+    """ final_project_myl42 is the final project of Monica Lee enrolled in HADM 3710. In the function, we will be doing
+    a wine cellar analysis. The function:
+     1. Creates and populates a database (SQL) using data in the Excel file, without modifying the Excel file. The tables
+     [and fields] are:
+            bottle_sizes [bottle_size_id, bottle_size]
+            vintages [vintage_id, vintage]
+            wineries [winery_id, winery, country]
+            wines[wine_id, wine, winery_id, winery, vintage_id, vintage, rating_score, bottle_size, bottles_purchased,
+            bottles_on_hand, drink_through]
+     2. Develops the best prediction model for the average_purchase_price using any variables that can be derived from the data
+        final_project_myl42 reads "Final_Project_1b_Wine_Cellar_Analysis.xlsx" into a dataframe. Then develops an OLS regression
+        using statsmodel with an 80/20 train/test split to predict average_purchase_price using the rating score, the vintage
+        year, the drink through year, and the color.Prints the shape of the test and train dataframes.
+            Using Relative MSE as a criterion, reports the accuracy on the test data of the following 53 Machine Learning models:
+                a. Ordinary Least Squares regression.
+                b. K-Nearest Neighbors Regression, with the number of neighbors taking the values of 5, 10, 20, 40, 80, and 160.
+                c. Ridge Regression, with alpha values of 0.0001, 0.001, 0.01, 0.1, 1, 10, and 100.
+                d. Lasso Regression, with alpha values of 0.0001, 0.001, 0.01, 0.1, 1, 10, and 100.
+                e. Elastic Net Regression, with alpha values of 0.0001, 0.001, 0.01, 0.1, 1, 10, and 100.
+                f. Random Forests with the number of estimators taking the values of 10, 25, 50, 100, and 200 and the maximum
+                depth taking the values of 2, 3, 4, 5, and 6.
+            Last but not least, tracks and reports the best Relative MSE and the model that yielded it.
+
+     3. Reports the accuracy of the predictions in appropriate ways
+
+     The function  return the results of the prediction models and the accuracy of the predictions.
+ """
+
+    # import all the necessary libraries
+    import pandas as pd
+    import sqlite3
+    import statsmodels.api as sm
+    from sklearn.model_selection import train_test_split
+    from dateutil import parser
+
+    # define a connection to the database - this will create a new database based on the name that you want
+        # then use that same name in a different function to seamlessly be able to structure then populate
+    conn = sqlite3.connect('final_project_myl42.db')
+
+    # define a cursor, which will perform actions on the database
+        # "a cursor is a thing that performs actions on the database"
+    cur = conn.cursor()
+
+# WE WILL BE CREATING THE TABLES (STRUCTURE ONLY) # We will create tables for: bottle size, vintages, wineries, and wines
+
+    # BOTTLE_SIZES TABLE - the input is from df_wines
+        # the id is a unique thing that can be used to link to other tables
+    cur.execute('''CREATE TABLE IF NOT EXISTS bottle_sizes
+            ([bottle_size_id] INTEGER PRIMARY KEY,
+            [bottle_size] SINGLE)
+            ''')
+    # WINTAGES TABLE - the input is from df_wines
+    cur.execute('''CREATE TABLE IF NOT EXISTS vintages
+            ([vintage_id] INTEGER PRIMARY KEY,
+            [vintage] INTEGER)
+            ''')
+    # WINERIES TABLE - the input is from df_wines
+    cur.execute('''CREATE TABLE IF NOT EXISTS wineries
+            ([winery_id] INTEGER PRIMARY KEY,
+            [winery] TEXT,
+            [country] TEXT)
+            ''')
+
+    # WINES TABLE - WHICH IS THE MAIN DATABASE IN THE SQL FILE STRUCTURE!
+    # it links to the bottle size, vintages, wineries tables
+    cur.execute('''CREATE TABLE IF NOT EXISTS wines
+                    ([wine_id] TEXT PRIMARY KEY,
+                    [wine] TEXT,
+                    [winery_id] INTEGER,
+                    [winery] TEXT,
+                    [vintage_id] INTEGER,
+                    [vintage] INTEGER,
+                    [rating_score] INTEGER,
+                    [bottle_size_id] INTEGER,
+                    [bottle_size] SINGLE,
+                    [bottles_purchased] INTEGER,
+                    [bottles_on_hand] INTEGER,
+                    [drink_through] INTEGER,
+                    FOREIGN KEY (bottle_size_id) 
+                        REFERENCES bottle_sizes (bottle_size_id),
+                    FOREIGN KEY (vintage_id)
+                        REFERENCES vintages (vintage_id),
+                    FOREIGN KEY (winery_id) 
+                        REFERENCES wineries (winery_id) 
+                    )
+                    ''')
+    conn.commit()
+
+    # WE WILL BE POPULATING IN THE TABLE STRUCTURES WE CREATED ABOVE!
+
+    # define the excel file that will be used to populate the database - taking data from this set to populate!
+    file_to_read = "Final_Project_1b_Wine_Cellar_Analysis.xlsx"
+
+    # load each Excel sheet into DF
+    df_wines = pd.read_excel(file_to_read, sheet_name="Sheet1")
+    # print(df_wines.to_string())
+    # return
+    # works up til now :-)
+
+    # select only the columns of interest from the Wines dataframe - Wines, rating score, country, color, vintage, bottle size
+    df_wines = df_wines[['Winery', 'Country', 'Wine', 'Vintage', 'Blt_Sz', 'Bottles_Purchased', 'Bottles_On_Hand',
+                         'Drink_Through', 'Rating_Score']]
+    # print(df_wines.to_string())
+    # return
+    # works up til now :-)
+
+    # load the data from the bottle_sizes dataframe into the database - pull relevant info and putting it in
+    cur = conn.cursor()
+    for index, row in df_wines.iterrows(): # step through the rows in the wines dataframe
+        # define the INSERT statement that will insert a new bottle_size record into the database
+        sInsert = "INSERT INTO bottle_sizes (bottle_size_id, bottle_size) VALUES (?, ?)"
+        cur.execute(sInsert, (index + 1, row['Blt_Sz']))
+    conn.commit()
+    # populated into sqlite :-)
+
+    # load the data from the vintages dataframe into the database - pull relevant info and putting it in
+    cur = conn.cursor()
+    for index, row in df_wines.iterrows():  # step through the rows in the wines dataframe
+        # define the INSERT statement that will insert the vintages record into the database
+        sInsert = "INSERT INTO vintages (vintage_id, vintage) VALUES (?, ?)"
+        cur.execute(sInsert, (index + 1, row['Vintage']))
+    conn.commit()
+    # populated into sqlite :-)
+
+    # load the data from the wineries dataframe into the database - pull relevant info and putting it in
+    cur = conn.cursor()
+    for index, row in df_wines.iterrows():  # step through the rows in the wines dataframe
+        # define the INSERT statement that will insert a winery and country record into the database
+        sInsert = "INSERT INTO wineries (winery_id, winery, country) VALUES (?, ?, ?)"
+        cur.execute(sInsert, (index + 1, row['Winery'], row['Country']))  # insert the new record
+    conn.commit()
+    # populated into sqlite :-)
+
+    # load the wines dataframe into sqlite
+    # load the wines dataframe into sqlite
+    cur = conn.cursor()
+    for index, row in df_wines.iterrows():
+        if not pd.isna(row[0]):
+            # Initialize the linked ids to 0
+            bottle_size_id, vintage_id, winery_id = 0, 0, 0
+            # Pull the linked field names from the dataframe row
+            bottle_size = str(row['Blt_Sz'])
+            vintage = str(row['Vintage'])
+            winery = str(row['Winery'])
+
+            for index2, row2 in df_wines.iterrows():
+                if bottle_size == str(row2['Blt_Sz']):
+                    bottle_size_id = index2 + 1
+                    break
+
+            for index2, row2 in df_wines.iterrows():
+                if vintage == str(row2['Vintage']):
+                    vintage_id = index2 + 1
+                    break
+
+            for index2, row2 in df_wines.iterrows():
+                if winery == str(row2['Winery']):
+                    winery_id = index2 + 1
+                    break
+
+            # Define the INSERT statement that will insert a new wines record into the database
+            sInsert = "INSERT INTO wines (wine_id, winery, wine, winery_id, " \
+                      "vintage_id, vintage, rating_score, bottle_size_id, bottle_size, " \
+                      "bottles_purchased, bottles_on_hand, drink_through) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            cur.execute(sInsert, (index + 1, row['Winery'], row['Wine'], winery_id, vintage_id, row['Vintage'],
+                                  row['Rating_Score'], bottle_size_id, row['Blt_Sz'], row['Bottles_Purchased'],
+                                  row['Bottles_On_Hand'], row['Drink_Through']))
+            # print(sInsert)  # Insert the new record
+            # used a parameterized query because the content of the wine names had single quotes which made it invalid to
+            # be inputted into the database! - learned about the parameterized query on pynative.com
+            # SOURCE: https://pynative.com/python-mysql-execute-parameterized-query-using-prepared-statement/
+    conn.commit()  # implement all the changes in the database
+    ### EVERYTHING WORKS UNTIL NOW!!! WORRIED ABOUT THE COLUMN TITLES... MAYBE YOU CAN FIX THAT LATER
+
+    # specify the name of the Excel file to read & read into dataframe
+    file_to_read = "Final_Project_1b_Wine_Cellar_Analysis.xlsx"
+    final_df = pd.read_excel(file_to_read)
+
+    # select only the desired fields in the dataframe
+    final_df = final_df[['Average_Purchase_Price','Rating_Score', 'Vintage', 'Drink_Through', 'Color']]
+
+    color_mapping = {'Red': 0, 'White': 1, 'Dessert': 2, 'Rose': 3}
+    # Assuming 'df' is your DataFrame containing the 'Color' column
+    final_df['Color'] = final_df['Color'].map(color_mapping)
+
+    # We need to define the x and the dependent variable the y.
+    X_all = final_df[['Rating_Score', 'Vintage', 'Drink_Through', 'Color']]
+    y_all = final_df['Average_Purchase_Price']
+    # print(X_all.to_string())
+    # print(y_all.to_string())
+    # returns the x and y!!
+
+    # drop any rows with missing values
+    final_df = final_df.dropna()
+
+    # we use StatsModel, which, by default, does not include a constant (i.e., an intercept), so add it:
+    X_all = sm.add_constant(X_all)
+
+    # create the 80/20 train/test split - same as in machine learning video
+    X_train, X_test, y_train, y_test = train_test_split(X_all, y_all, test_size=0.2, train_size=0.8, random_state=0)
+    # Prints the shape of the test and train dataframes.
+    print('Test dataframe shape: ' + str(X_test.shape))
+    print('Train dataframe shape: ' + str(X_train.shape))
+
+    # initialize the list that will store the best model information - same as in machine learning video
+    best_model = ['n/a', 0, 0]  # name of the best model, mse of the best model, reference mse (from OLS)
+
+    # define the OLS model, using the test data - same as in machine learning video
+    ols_model = sm.OLS(y_test, X_test).fit()
+    ols_predictions = ols_model.predict(X_test)  # predict the values for the training data
+    best_model = myl42_checkandprint('OLS', best_model, y_test, ols_predictions)
+
+    ### USE MACHINE LEARNING MODELS:
+    # K-Nearest Neighbors Regression, with the number of neighbors taking the values of 5, 10, 20, 40, 80, and 97.
+    # Ridge Regression, with alpha values of 0.0001, 0.001, 0.01, 0.1, 1, 10, and 100.
+    # Lasso Regression, with alpha values of 0.0001, 0.001, 0.01, 0.1, 1, 10, and 100.
+    # Elastic Net Regression, with alpha values of 0.0001, 0.001, 0.01, 0.1, 1, 10, and 100.
+    # Random Forests with the number of estimators taking the values of 10, 25, 50, 100, and 200 and the maximum depth
+    #   taking the values of 2, 3, 4, 5, and 6
+
+    from sklearn.neighbors import KNeighborsRegressor
+    for kval in [5, 10, 20, 40, 80, 97]:  # step through the number of neighbors
+        # define the k-neighbors model, for the current number of neighbors
+        kneighbors_model = KNeighborsRegressor(n_neighbors=kval)
+        kneighbors_model.fit(X_test, y_test)  # fit the model using the training data
+        kneighbors_preds = kneighbors_model.predict(X_test)  # predict the values for the training data
+        best_model = myl42_checkandprint('KNeighbors w ' + str(kval) + ' neighbors', best_model, y_test, kneighbors_preds)
+
+    from sklearn.linear_model import Ridge
+    for alpha_val in [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]:  # step through the values of alpha
+        # define the ridge regression model, for the current value of alpha
+        ridge_model = Ridge(alpha=alpha_val)
+        ridge_model.fit(X_test, y_test)  # fit the model using the training data
+        ridge_preds = ridge_model.predict(X_test)  # predict the values for the training data
+        best_model = myl42_checkandprint('Ridge w alpha = ' + str(alpha_val), best_model, y_test, ridge_preds)
+
+    from sklearn.linear_model import Lasso
+    for alpha_val in [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]:  # step through the values of alpha
+        # define the lasso regression model, for the current value of alpha
+        lasso_model = Lasso(alpha=alpha_val)
+        lasso_model.fit(X_test, y_test)  # fit the model using the training data
+        lasso_preds = lasso_model.predict(X_test)  # predict the values for the training data
+        best_model = myl42_checkandprint('Lasso w alpha = ' + str(alpha_val), best_model, y_test, lasso_preds)
+
+    from sklearn.linear_model import ElasticNet
+    for alpha_val in [0.0001, 0.001, 0.01, 0.1, 1, 10]:  # step through the values of alpha
+        # define the elastic net regression model, for the current value of alpha
+        elnet_model = ElasticNet(alpha=alpha_val)
+        elnet_model.fit(X_test, y_test)  # fit the model using the training data
+        elnet_preds = elnet_model.predict(X_test)  # predict the values for the training data
+        best_model = myl42_checkandprint('Elastic Net w alpha = ' + str(alpha_val), best_model, y_test, elnet_preds)
+
+    from sklearn.ensemble import RandomForestRegressor
+    for num_est in [10, 25, 50, 100, 200]:  # step through 5 values of the number of estimators parameters
+        for mx_depth in [2, 3, 4, 5, 6]:  # step through 5 maximum depth parameters
+            # define the random forest model, for the current values of number of estimators $ max depth
+            forest_model = RandomForestRegressor(n_estimators=num_est, max_depth=mx_depth, random_state=1)
+            forest_model.fit(X_test, y_test)  # fit the model using the training data
+            forest_preds = forest_model.predict(X_test)  # predict the values for the training data
+            best_model = myl42_checkandprint(
+                'Random Forest w = ' + str(num_est) + ' estimators and max depth of ' + str(mx_depth), best_model, y_test, forest_preds)
+
+    print('\nBest model is: ' + best_model[0])
+    print('Lowest MSE = ' + str(best_model[1] / best_model[2]))
+
+    # print the model summary
+    print(ols_model.summary())
+
+def myl42_checkandprint(model_name, best_model, y_test, predictions): # same help functions as before
+    """
+    myl42_checkandprint takes actual and predicted values, calculates the mean squared error, prints it and records if it is
+    lowest MSE updates the best model.
+
+    Returns the best model found so far
+    """
+    from sklearn.metrics import mean_squared_error
+    mse = mean_squared_error(y_test, predictions)
+    if best_model[0] == 'n/a': # if the best model is undefined...
+        best_model[2] = mse # set the reference mse
+        best_model[1] = mse+1 # set the best model mse such that it will be updated
+    if mse < best_model[1]: # if the current mse is lower than the best...
+        best_model[0] = model_name # record the name of the best model
+        best_model[1] = mse # update the best mse
+    print(model_name + ': ' + str(mse/best_model[2])) # print the relative mse (mse/initial mse)
+
+    return best_model
+
+####
