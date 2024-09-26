@@ -1,4 +1,4 @@
-# pythonproj
+# Predictive Model for Wines Purchase Prices
 This project was done as the final project in spring 23 for HADM 3710/6710 at Cornell University. 
 
 The Key objectives are: 
